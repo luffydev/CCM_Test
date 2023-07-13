@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>[Front] -> Sous Objectif numéro 2</title>
+</head>
+<body>
+  <canvas id="container"></canvas>
+
+  <script>
+    // We generate random random gray shade background
+    function generateRandomGrayShade() {
+      const lGrayValue = Math.floor(Math.random() * 256);
+      return `rgb(${lGrayValue}, ${lGrayValue}, ${lGrayValue})`;
+    }
+
+    // Here we build our canvas and show information from SSE 
+    function displayEventOnCanvas(pEvent) {
+      const lCanvas = document.getElementById('container');
+      const lContext = lCanvas.getContext('2d');
+
+      // Définition de la taille du canvas
+      lCanvas.width = 400; // Largeur spécifiée à l'init du widget (modifiable selon vos besoins)
+      lCanvas.height = 300; // Hauteur spécifiée à l'init du widget (modifiable selon vos besoins)
+
+      // Définition de la couleur de fond du canvas
+      const lBGColor = generateRandomGrayShade();
+      lContext.fillStyle = lBGColor;
+      lContext.fillRect(0, 0, lCanvas.width, lCanvas.height);
+
+      // Définition de la couleur du texte et de l'heure
+      const lTextColor = `rgb(${255 - lBGColor[4]}, ${255 - lBGColor[4]}, ${255 - lBGColor[4]})`;
+
+      // Affichage de la valeur de l'event au centre du canvas
+      lContext.fillStyle = lTextColor;
+      lContext.font = '24px Arial';
+      lContext.textAlign = 'center';
+      lContext.textBaseline = 'middle';
+      lContext.fillText(pEvent.value, lCanvas.width / 2, lCanvas.height / 2);
+
+      // Affichage de l'heure de l'event en coin en bas à droite du canvas
+      lContext.fillStyle = lTextColor;
+      lContext.font = '12px Arial';
+      lContext.textAlign = 'right';
+      lContext.textBaseline = 'bottom';
+      lContext.fillText(pEvent.time, lCanvas.width - 10, lCanvas.height - 10);
+    }
+
+    // Connexion à la route des événements Server-Sent Events
+    const lSrc = new EventSource('/events');
+    lSrc.addEventListener('news', function(pEvent) {
+      displayEventOnCanvas(JSON.parse(pEvent.data));
+    });
+
+  </script>
+</body>
+</html>

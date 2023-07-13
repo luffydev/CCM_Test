@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>[Front] -> Sous Objectif numéro 5</title>
+</head>
+<body>
+
+  <div id="firstCanvas">
+    <div>Loading widget...</div>
+  </div>
+  <div id="secondCanvas">
+    <div>Loading widget...</div>
+  </div>
+
+  <script>
+
+    let lHoverTimeout = null;
+    let lHoveredID = [];
+    
+    const lFirstWidgetFormat = {
+        container: '#firstCanvas', // Container ID of our widget
+        width: 400, // Width of our first widget
+        height: 200, // Height of our first
+        valueFont: '20px Arial', // Font of our first widget value
+        timeFont: '12px Arial', // Font of our first widget time
+    };
+
+    const lSecondWidgetFormat = {
+        container: '#secondCanvas', // Container ID of our widget
+        width: 300, // Width of our second widget
+        height: 150, // Height of our second widget
+        valueFont: '16px Arial', // Font of our second widget value
+        timeFont: '10px Arial', // Font of our second widget time
+    };
+
+    // function for send stats to our server
+    function sendStatsToServer(pEventType, pID){
+        fetch('/stats', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-plugin-id': pID
+            },
+
+            body: JSON.stringify({pEventType})
+        }).then(() => {
+            console.log("Stats sended to the server !");
+
+        }).catch((pError) => {
+            console.error("Unable to send stats to the server :", pError);
+        });
+    }
+
+    // Add event listener when the mouse enter in the canvas and wait 2 sec for send VIEWED event 
+    addEventListener('mouseover', function(pEvent) {
+        const lID = pEvent.target.id;
+
+        if(pEvent.target.tagName === 'CANVAS' && lHoverTimeout == null && !lHoveredID.includes(lID) ){
+
+            lHoverTimeout = setTimeout(() => {
+                lHoveredID.push(lID);
+                sendStatsToServer('VIEWED', lID);
+                lHoverTimeout = null;
+            }, 2000);
+        }       
+    });
+
+    // Add event listener when the mouse leave our canvas, if it's before 2 seconds we don't send our VIEWED event
+    addEventListener('mouseout', (pEvent) => {
+        if(pEvent.target.tagName == 'CANVAS' && lHoverTimeout != null){
+            clearTimeout(lHoverTimeout);
+            lHoverTimeout = null;
+        }
+    });
+
+    // Our WidgetAPI class
+    class WidgetAPI{
+        constructor(pFormat){
+
+            if(!pFormat){
+                throw new Error("Widget format can't be empty");
+            }
+
+            this.currentFormat = pFormat;
+        }
+
+        // We init our widget and we get first event 
+        init(){
+            const lPromise = new Promise((pResolve, pReject) => {
+                const lEventSource = new EventSource('/events');
+                lEventSource.addEventListener('news', (pEvent) => {                    
+                    const lData = JSON.parse(event.data);
+                    pResolve();
+                    this.updateCanvas(lData);
+                })
+
+            });
+
+            return lPromise;
+        }
+
+        // We update our canvas with new data
+        updateCanvas(pData){
+
+            // We get our canvas container
+            const lContainer = document.querySelector(this.currentFormat.container);
+            const lCanvas = document.createElement('canvas');
+            
+            // we put our canvas current format
+            lCanvas.width = this.currentFormat.width;
+            lCanvas.height = this.currentFormat.height;
+
+            const lContext = lCanvas.getContext('2d');
+            const lShade = Math.floor(Math.random() * 256);
+
+            const lBGColor = `rgb(${lShade}, ${lShade}, ${lShade})`;
+            const lTextColor = this.generateTextColor(lBGColor);
+
+            
+
+            lContext.clearRect(0, 0, lCanvas.width, lCanvas.height);
+            lContext.fillStyle = lBGColor;
+            lContext.fillRect(0, 0, lCanvas.width, lCanvas.height);
+
+            // We display event value 
+            lContext.font = this.currentFormat.valueFont;
+            lContext.fillStyle = lTextColor;
+            lContext.textAlign = 'center';
+            lContext.fillText(pData.value, lCanvas.width / 2, lCanvas.height / 2);
+
+            // We display event time
+            lContext.font = this.currentFormat.timeFont;
+            lContext.fillStyle = lTextColor;
+            lContext.fillText(pData.time, lCanvas.width - 50, lCanvas.height - 50);
+
+            // We put our event id to our element to get it later 
+            lCanvas.id = pData.value;
+            lContainer.replaceChildren(lCanvas);
+
+            sendStatsToServer('DISPLAY', lCanvas.id);
+        }
+
+        generateTextColor(pBackgroundColor) {
+            const lColorValue = parseInt(pBackgroundColor.slice(4, -1).split(', ')[0]);
+
+            // We check if color is too dark 
+            if (lColorValue <= 127) {
+                // We generate random light color
+                const lShade = Math.floor(Math.random() * 156) + 100; // Between 100 and 255
+                return `rgb(${lShade}, ${lShade}, ${lShade})`;
+            } else {
+                // We generate random dark color
+                const lShade = Math.floor(Math.random() * 101); // Between 0 and 100
+                return `rgb(${lShade}, ${lShade}, ${lShade})`;
+            }
+        }
+
+    }
+
+    // Let's declare our two canvas 
+    let lFirstWidget = new WidgetAPI(lFirstWidgetFormat);
+    let lSecondWidget = new WidgetAPI(lSecondWidgetFormat);
+
+    Promise.all([lFirstWidget.init(), lSecondWidget.init()]).then((pData) => {
+        console.log("[FRONT] -> Canvas initialized successfully !");
+    });
+  </script>
+</body>
+</html>
